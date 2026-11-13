@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resume Bullet Point Generator</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--ink:#1c1b19;--mute:#6b6a65;--line:#e2e0d9;--acc:#1f5f4a;--accbg:#e4f0ea;--warn:#8a5a00;--warnbg:#fbf1dc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151513;--card:#1f1f1c;--ink:#efede6;--mute:#a09e95;--line:#33322d;--acc:#6fcfa6;--accbg:#1d3029;--warn:#f0c46a;--warnbg:#33290f}}
+:root[data-theme="dark"]{--bg:#151513;--card:#1f1f1c;--ink:#efede6;--mute:#a09e95;--line:#33322d;--acc:#6fcfa6;--accbg:#1d3029;--warn:#f0c46a;--warnbg:#33290f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 56px}
+h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.02em}
+.sub{color:var(--mute);margin:0 0 22px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+h2{font-size:1rem;margin:0 0 10px}
+label{font-size:.85rem;color:var(--mute);display:block;margin-bottom:6px}
+textarea{width:100%;min-height:220px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:.95rem}
+textarea:focus{outline:2px solid var(--acc);outline-offset:1px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{font:inherit;font-size:.9rem;border-radius:8px;padding:9px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:var(--card);font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+.bul{border-left:3px solid var(--acc);background:var(--accbg);padding:12px 14px;border-radius:0 8px 8px 0;margin:0 0 10px}
+.meta{font-size:.78rem;color:var(--mute);margin-top:6px}
+.warn{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem;margin-top:10px}
+.warn ul{margin:6px 0 0;padding-left:20px}
+.empty{color:var(--mute);font-size:.92rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:var(--accbg);color:var(--acc);border-radius:99px;padding:3px 10px;font-size:.8rem}
+pre{white-space:pre-wrap;word-wrap:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;font:.82rem/1.55 ui-monospace,Menlo,Consolas,monospace;max-height:420px;overflow:auto;margin:0}
+.sec{margin-top:16px}
+.note{font-size:.85rem;color:var(--mute);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Resume Bullet Point Generator</h1>
+<p class="sub">Paste raw notes about a project, internship or achievement. Get one or two ATS-friendly bullets in the What → How → Measurable Impact → Outcome structure, with nothing invented.</p>
+
+<div class="grid">
+  <div class="card">
+    <h2>Raw input</h2>
+    <label for="inp">Describe your project, internship or achievement</label>
+    <textarea id="inp" placeholder="e.g. I built a tool in Python that…"></textarea>
+    <div class="row">
+      <button class="p" id="gen">Generate bullets</button>
+      <button id="ex">Load example</button>
+      <button id="cpfull">Copy prompt + my input</button>
+    </div>
+    <div class="note" id="status"></div>
+  </div>
+  <div class="card">
+    <h2>Result</h2>
+    <div id="out"><div class="empty">Your bullets will appear here.</div></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var PROMPT = [
+"ROLE",
+"You are an expert technical resume writer who writes ATS-friendly bullet points for students and early-career engineers.",
+"",
+"TASK",
+"Convert the unstructured INPUT below into at most TWO professional resume bullet points.",
+"",
+"STRUCTURE (each bullet, in one sentence)",
+"What (strong action verb + deliverable) -> How (tools, technologies, method) -> Measurable Impact (numbers) -> Outcome (practical benefit).",
+"",
+"STRICT RULES",
+"1. Start every bullet with a strong past-tense action verb (Developed, Engineered, Automated, Designed, Implemented, Optimized...). Never start with I, Responsible for, or Worked on.",
+"2. Use relevant technical terminology taken from the INPUT (languages, libraries, frameworks, tools).",
+"3. Include a number (records processed, time saved, accuracy improved, users served, etc.) ONLY if that exact figure, or the data to compute it, appears in the INPUT.",
+"4. NEVER fabricate or estimate statistics, percentages, scale, achievements or outcomes. Do not round up, infer, or assume typical values.",
+"5. Every claim must be supported by the INPUT. If unsure, leave it out.",
+"6. If no measurable data is present, still write a meaningful bullet from the available facts (What + How + the outcome the input states), and list which metrics would strengthen it.",
+"7. Keep each bullet concise: one sentence, ideally 20-35 words, no first-person pronouns, no filler adjectives (hardworking, passionate), no emojis, ends with a period.",
+"8. Use a second bullet only when the INPUT contains a distinct accomplishment. Otherwise output one bullet.",
+"",
+"OUTPUT FORMAT (return ONLY this JSON, no markdown fences, no commentary)",
+"{",
+"  \"bullets\": [\"bullet 1\", \"bullet 2 (optional)\"],",
+"  \"has_metrics\": true or false,",
+"  \"missing_metrics\": [\"specific metric the user could add, e.g. number of student records processed\"]",
+"}",
+"missing_metrics must be an empty list if the bullets already contain real numbers from the input and nothing important is missing.",
+"",
+"EXAMPLE",
+"INPUT: I developed a Result Analysis System using Python and Pandas. It processes student marks, calculates subject-wise averages and pass percentages, identifies toppers, and generates performance reports. Previously, these calculations were performed manually using Excel.",
+"(No record count or time saved is given, so none may be invented.)",
+"OUTPUT: {\"bullets\":[\"Developed a Python-based Result Analysis System using Pandas to automate subject-wise averages, pass percentages, topper identification and performance report generation, replacing manual Excel-based calculations.\"],\"has_metrics\":false,\"missing_metrics\":[\"Number of student records processed\",\"Time saved versus the manual Excel process\"]}",
+"",
+"INPUT:"
+].join("\n");
+
+var EXAMPLE = "I developed a Result Analysis System using Python and Pandas. It processes student marks, calculates subject-wise averages and pass percentages, identifies toppers, and generates performance reports. Previously, these calculations were performed manually using Excel.";
+
+var $ = function(id){return document.getElementById(id)};
+
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function copy(text, btn){
+  var old = btn.textContent;
+  function done(){btn.textContent="Copied";setTimeout(function(){btn.textContent=old},1400)}
+  try{navigator.clipboard.writeText(text).then(done,fallback)}catch(e){fallback()}
+  function fallback(){var t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();try{document.execCommand("copy");done()}catch(e){}t.remove()}
+}
+$("cpfull").onclick=function(){
+  var v=$("inp").value.trim();
+  if(!v){$("status").textContent="Add some input text first.";return}
+  copy(PROMPT+"\n"+v,this)
+};
+$("ex").onclick=function(){$("inp").value=EXAMPLE;$("status").textContent=""};
+
+var sample=null;
+(async function(){
+  try{sample=await claude.use("sample")}catch(e){sample=null}
+  if(!sample){
+    $("gen").disabled=true;
+    $("status").textContent="Live generation is unavailable in this view. Use “Copy prompt + my input” and paste it into any AI chat.";
+  }
+})();
+
+function render(d){
+  var h="";
+  var b=(d.bullets||[]).slice(0,2);
+  if(!b.length){$("out").innerHTML='<div class="empty">No bullet could be produced from that input. Add more detail about what you built and how.</div>';return}
+  b.forEach(function(x,i){
+    h+='<div class="bul">'+esc(x)+'<div class="meta">Bullet '+(i+1)+' · '+x.trim().split(/\s+/).length+' words</div></div>';
+  });
+  h+='<div class="row" style="margin-top:0"><button id="cpb">Copy bullets</button></div>';
+  var m=d.missing_metrics||[];
+  if(m.length){
+    h+='<div class="warn"><strong>No fabricated numbers.</strong> These metrics would strengthen the bullet if you have real data:<ul>'+m.map(function(x){return"<li>"+esc(x)+"</li>"}).join("")+"</ul></div>";
+  }else{
+    h+='<div class="chips"><span class="chip">Metrics sourced from your input</span></div>';
+  }
+  $("out").innerHTML=h;
+  $("cpb").onclick=function(){copy(b.map(function(x){return"• "+x}).join("\n"),this)};
+}
+
+$("gen").onclick=async function(){
+  var v=$("inp").value.trim();
+  if(!v){$("status").textContent="Add some input text first.";return}
+  if(!sample)return;
+  var btn=this;btn.disabled=true;$("status").textContent="Generating…";
+  $("out").innerHTML='<div class="empty">Working…</div>';
+  try{
+    var r=await sample(PROMPT+"\n"+v,{cache:false});
+    var t=(r.text||"").replace(/```json|```/g,"").trim();
+    var s=t.indexOf("{"),e=t.lastIndexOf("}");
+    render(JSON.parse(t.slice(s,e+1)));
+    $("status").textContent="";
+  }catch(err){
+    $("out").innerHTML='<div class="empty">Could not generate a result. Try again, or copy the prompt and use it in your AI chat.</div>';
+    $("status").textContent=(err&&err.code==="rate_limited")?"Rate limited. Wait a moment and retry.":"";
+  }
+  btn.disabled=false;
+};
+</script>
+</body>
+</html>

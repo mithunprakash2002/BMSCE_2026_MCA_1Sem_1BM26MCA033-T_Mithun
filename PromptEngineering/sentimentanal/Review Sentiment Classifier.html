@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Review Sentiment Classifier</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--text:#1f1e1b;--muted:#6b6962;--line:#e2dfd7;--accent:#c4552d;--pos:#2f7d4f;--neg:#b3382c;--neu:#8a6d1f;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1a18;--card:#262522;--text:#efede6;--muted:#a09d94;--line:#3a3834;--accent:#e8805a;--pos:#6fcf97;--neg:#f08a7e;--neu:#e0be5c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1b1a18;--card:#262522;--text:#efede6;--muted:#a09d94;--line:#3a3834;--accent:#e8805a;--pos:#6fcf97;--neg:#f08a7e;--neu:#e0be5c;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+h2{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+textarea{width:100%;min-height:110px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;resize:vertical}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 14px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chips button{font-size:.85rem;padding:5px 10px}
+#result{font-size:2.6rem;font-weight:700;text-align:center;padding:18px 0;letter-spacing:.01em}
+#result.Positive{color:var(--pos)}#result.Negative{color:var(--neg)}#result.Neutral{color:var(--neu)}
+#result.idle{color:var(--muted);font-size:1.1rem;font-weight:400}
+.note{color:var(--muted);font-size:.85rem}
+details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
+.hl{padding:1px 4px;border-radius:4px;margin:0 1px}
+.hl.p{background:color-mix(in srgb,var(--pos) 25%,transparent)}
+.hl.n{background:color-mix(in srgb,var(--neg) 25%,transparent)}
+#why{margin-top:10px;line-height:2}
+</style>
+</head>
+<body>
+<main>
+  <h1>Review Sentiment Classifier</h1>
+  <p class="sub">Paste a customer review. The output is exactly one word: Positive, Negative, or Neutral.</p>
+
+  <section>
+    <h2>Customer review</h2>
+    <textarea id="review" placeholder="e.g. The headphones sound amazing and arrived early!"></textarea>
+    <div class="row">
+      <button class="primary" id="go">Classify</button>
+      <button id="clear">Clear</button>
+    </div>
+    <div class="row chips" id="samples"></div>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <div id="result" class="idle">Waiting for a review…</div>
+    <details>
+      <summary>Show how the score was computed</summary>
+      <div id="why" class="note"></div>
+    </details>
+  </section>
+
+  <p class="note">This demo uses a rule-based classifier (word lists, negation, "but" clauses, star ratings) that runs entirely in your browser. It is a simple approximation: an AI model with the prompt will handle sarcasm and nuance better.</p>
+</main>
+
+<script>
+var POS = {love:2,loved:2,loves:2,great:2,excellent:3,amazing:3,awesome:3,fantastic:3,perfect:3,wonderful:3,best:2,good:1.5,nice:1,happy:2,satisfied:2,pleased:2,recommend:2,recommended:2,impressed:2,impressive:2,fast:1,quick:1,easy:1,comfortable:1.5,sturdy:1.5,durable:1.5,reliable:2,beautiful:2,gorgeous:2,smooth:1,worth:1.5,delighted:3,superb:3,brilliant:3,flawless:3,helpful:1.5,thanks:1,favorite:2,fine:0.5,decent:0.5,solid:1.5,cheap:0.3};
+var NEG = {hate:3,hated:3,terrible:3,awful:3,horrible:3,worst:3,bad:2,poor:2,disappointed:2.5,disappointing:2.5,broken:2.5,broke:2.5,defective:3,useless:3,waste:2.5,refund:2,return:1,returned:1.5,slow:1.5,late:1.5,damaged:2.5,cracked:2,faulty:3,cheaply:1.5,flimsy:2,overpriced:2,scam:3,fake:2.5,rude:2,unhappy:2,annoying:2,annoyed:2,regret:2.5,problem:1.5,problems:1.5,issue:1,issues:1,failed:2.5,fails:2,stopped:1.5,missing:1.5,wrong:2,worse:2,mediocre:1.5,never:0.5,garbage:3,trash:3,poorly:2,overheats:2,uncomfortable:2};
+var NEGATORS = {not:1,no:1,never:1,"don't":1,dont:1,"didn't":1,didnt:1,"isn't":1,isnt:1,"wasn't":1,wasnt:1,"doesn't":1,doesnt:1,"can't":1,cant:1,"won't":1,wont:1,hardly:1,barely:1,without:1};
+var BOOST = {very:1.4,really:1.4,extremely:1.6,so:1.3,absolutely:1.6,totally:1.4,incredibly:1.6,super:1.4,highly:1.4};
+var DAMP = {slightly:.6,somewhat:.6,"kinda":.6,"bit":.7,"little":.7,"fairly":.8};
+
+function tokenize(t){ return t.toLowerCase().replace(/[’]/g,"'").match(/[a-z']+|[!?.,;:]|\d+(?:\.\d+)?(?:\/\d+)?/g) || []; }
+
+function classify(text){
+  var toks = tokenize(text), hits = [], score = 0, clauseStart = 0, afterBut = false;
+  // split on "but/however/although" – the later clause carries more weight
+  var segments = [[]];
+  toks.forEach(function(t,i){
+    if(/^(but|however|though|although|yet)$/.test(t)){ segments.push([]); segments[segments.length-1].isAfter = true; }
+    else segments[segments.length-1].push(t);
+  });
+  var hasContrast = segments.length > 1;
+  segments.forEach(function(seg,si){
+    var w = hasContrast ? (si === 0 ? 0.6 : 1.3) : 1;
+    for(var i=0;i<seg.length;i++){
+      var t = seg[i], base = POS[t] !== undefined ? POS[t] : (NEG[t] !== undefined ? -NEG[t] : 0);
+      if(!base) continue;
+      var mult = 1, negated = false;
+      for(var k=1;k<=3 && i-k>=0;k++){
+        var p = seg[i-k];
+        if(NEGATORS[p]) negated = true;
+        if(BOOST[p]) mult *= BOOST[p];
+        if(DAMP[p]) mult *= DAMP[p];
+        if(/[.!?;]/.test(p)) break;
+      }
+      var v = base * mult * w;
+      if(negated) v = -v * 0.8;
+      score += v;
+      hits.push({word:t, v:v, neg:negated});
+    }
+  });
+  // star ratings like "5 stars", "2/5", "4 out of 5"
+  var m = text.toLowerCase().match(/(\d(?:\.\d)?)\s*(?:\/\s*5|out of 5|stars?)/);
+  if(m){ var r = parseFloat(m[1]); if(r>=1 && r<=5){ var sv = (r-3)*1.5; score += sv; hits.push({word:m[0].trim(), v:sv, neg:false}); } }
+  var ex = (text.match(/!/g)||[]).length;
+  if(ex && Math.abs(score)>=1) score += Math.sign(score) * Math.min(ex,3) * 0.3;
+  var label = score >= 1 ? "Positive" : score <= -1 ? "Negative" : "Neutral";
+  return {label:label, score:score, hits:hits};
+}
+
+var $ = function(id){return document.getElementById(id)};
+function run(){
+  var text = $("review").value.trim(), out = $("result");
+  if(!text){ out.className="idle"; out.textContent="Waiting for a review…"; $("why").textContent=""; return; }
+  var r = classify(text);
+  out.className = r.label; out.textContent = r.label;
+  var why = $("why"); why.textContent = "";
+  if(!r.hits.length){ why.textContent = "No sentiment words found, so the review is treated as Neutral. "; }
+  r.hits.forEach(function(h){
+    var s = document.createElement("span");
+    s.className = "hl " + (h.v>0?"p":"n");
+    s.textContent = h.word + (h.neg?" (negated)":"") + " " + (h.v>0?"+":"") + h.v.toFixed(1);
+    why.appendChild(s);
+  });
+  var tot = document.createElement("div");
+  tot.textContent = "Total score: " + r.score.toFixed(1) + "  (≥ 1 Positive, ≤ −1 Negative, otherwise Neutral)";
+  why.appendChild(tot);
+}
+
+var SAMPLES = [
+ ["Positive","Absolutely love this blender! Powerful, quiet and so easy to clean. Highly recommend."],
+ ["Negative","Terrible quality. The strap broke after two days and customer service was rude. Want a refund."],
+ ["Neutral","The package arrived on Tuesday. It is a black backpack with two pockets."],
+ ["Mixed","The screen is gorgeous but the battery life is poor and it overheats."],
+ ["Negation","Not good at all. I wouldn't buy this again."],
+ ["Rating","3/5"]
+];
+SAMPLES.forEach(function(s){
+  var b = document.createElement("button"); b.textContent = s[0];
+  b.onclick = function(){ $("review").value = s[1]; run(); };
+  $("samples").appendChild(b);
+});
+$("go").onclick = run;
+$("clear").onclick = function(){ $("review").value=""; run(); };
+$("review").addEventListener("keydown", function(e){ if((e.ctrlKey||e.metaKey) && e.key==="Enter") run(); });
+</script>
+</body>
+</html>
